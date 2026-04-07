@@ -1,19 +1,5 @@
 "use client";
 
-/**
- * KnowledgeUpload — RAG document ingestion panel.
- *
- * Visibility is controlled by the env var NEXT_PUBLIC_ENABLE_RAG_UPLOAD=true.
- * When false/absent the component renders nothing.
- *
- * Features:
- *  - Drag-and-drop OR click-to-browse
- *  - Multi-file (PDF, DOCX, TXT, CSV, XLSX, MD) up to 20 MB each
- *  - Per-file progress + status badges (indexed / rejected / error)
- *  - Summary bar on completion
- *  - Full keyboard/a11y support
- */
-
 import { useState, useRef, useCallback, DragEvent } from "react";
 import {
   Upload, X, FileText, FileSpreadsheet, File,
@@ -97,9 +83,10 @@ function StagedRow({ sf, onRemove }: { sf: StagedFile; onRemove: (id: string) =>
     <div
       style={{
         display: "flex", alignItems: "center", gap: "10px",
-        padding: "8px 12px", borderRadius: "10px",
+        padding: "10px 12px", borderRadius: "10px",
         background: "var(--surface2)", border: "1px solid var(--border)",
         transition: "border-color 0.2s",
+        minHeight: "var(--touch-min)",
       }}
     >
       <FileIcon name={sf.file.name} />
@@ -122,14 +109,16 @@ function StagedRow({ sf, onRemove }: { sf: StagedFile; onRemove: (id: string) =>
       <StatusBadge status={sf.status} reason={sf.reason} />
 
       {!busy && !sf.status && (
+        /* Remove — 36x36 touch target */
         <button
           onClick={() => onRemove(sf.id)}
           aria-label={`Remove ${sf.file.name}`}
           style={{
-            width: "22px", height: "22px", borderRadius: "6px",
+            width: "36px", height: "36px", borderRadius: "6px",
             display: "flex", alignItems: "center", justifyContent: "center",
             background: "none", border: "1px solid var(--border)",
             color: "var(--text-muted)", cursor: "pointer", flexShrink: 0,
+            minHeight: "unset",
           }}
         >
           <X size={11} />
@@ -144,13 +133,11 @@ function StagedRow({ sf, onRemove }: { sf: StagedFile; onRemove: (id: string) =>
 export default function KnowledgeUpload() {
   if (!ENABLED) return null;
 
-  const [staged, setStaged]       = useState<StagedFile[]>([]);
-  const [uploading, setUploading] = useState(false);
+  const [staged,     setStaged]     = useState<StagedFile[]>([]);
+  const [uploading,  setUploading]  = useState(false);
   const [isDragging, setIsDragging] = useState(false);
-  const [summary, setSummary]     = useState<{ indexed: number; failed: number } | null>(null);
+  const [summary,    setSummary]    = useState<{ indexed: number; failed: number } | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-
-  // ── Validate + stage files ──────────────────────────────────────────────
 
   const stageFiles = useCallback((raw: File[]) => {
     const remaining = MAX_FILES - staged.length;
@@ -159,9 +146,8 @@ export default function KnowledgeUpload() {
 
     for (const f of incoming) {
       const ext = "." + f.name.split(".").pop()?.toLowerCase();
-      if (!ALLOWED_EXT.includes(ext)) continue;           // silently skip bad types
-      if (f.size > MAX_SIZE_MB * 1024 * 1024) continue;  // silently skip too-large
-      // Deduplicate by name+size
+      if (!ALLOWED_EXT.includes(ext)) continue;
+      if (f.size > MAX_SIZE_MB * 1024 * 1024) continue;
       const dup = staged.some(s => s.file.name === f.name && s.file.size === f.size);
       if (dup) continue;
       newItems.push({ file: f, id: `${f.name}-${Date.now()}-${Math.random()}` });
@@ -171,8 +157,6 @@ export default function KnowledgeUpload() {
     setSummary(null);
   }, [staged]);
 
-  // ── Drag handlers ───────────────────────────────────────────────────────
-
   const onDragOver  = (e: DragEvent) => { e.preventDefault(); setIsDragging(true); };
   const onDragLeave = (e: DragEvent) => { e.preventDefault(); setIsDragging(false); };
   const onDrop      = (e: DragEvent) => {
@@ -181,13 +165,9 @@ export default function KnowledgeUpload() {
     stageFiles(Array.from(e.dataTransfer.files));
   };
 
-  // ── Remove a staged file ────────────────────────────────────────────────
-
   const removeFile = useCallback((id: string) => {
     setStaged(prev => prev.filter(s => s.id !== id));
   }, []);
-
-  // ── Upload ───────────────────────────────────────────────────────────────
 
   const handleUpload = async () => {
     const pending = staged.filter(s => !s.status);
@@ -196,51 +176,34 @@ export default function KnowledgeUpload() {
     setUploading(true);
     setSummary(null);
 
-    // Mark all pending as uploading
-    setStaged(prev => prev.map(s =>
-      !s.status ? { ...s, status: "uploading" } : s
-    ));
+    setStaged(prev => prev.map(s => !s.status ? { ...s, status: "uploading" } : s));
 
     try {
       const result = await uploadFiles(pending.map(s => s.file));
 
-      // Map results back to staged files by filename
       setStaged(prev => prev.map(s => {
-        const r = result.files.find(
-          (f: FileUploadResult) => f.filename === s.file.name
-        );
+        const r = result.files.find((f: FileUploadResult) => f.filename === s.file.name);
         if (!r) return s;
-        return {
-          ...s,
-          status:  r.status as StagedFile["status"],
-          chunks:  r.chunks_inserted,
-          reason:  r.reason,
-        };
+        return { ...s, status: r.status as StagedFile["status"], chunks: r.chunks_inserted, reason: r.reason };
       }));
 
       setSummary({ indexed: result.summary.indexed, failed: result.summary.failed });
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Upload failed";
-      setStaged(prev => prev.map(s =>
-        s.status === "uploading" ? { ...s, status: "error", reason: msg } : s
-      ));
+      setStaged(prev => prev.map(s => s.status === "uploading" ? { ...s, status: "error", reason: msg } : s));
     } finally {
       setUploading(false);
     }
   };
-
-  // ── Clear completed files ───────────────────────────────────────────────
 
   const clearDone = () => {
     setStaged(prev => prev.filter(s => !s.status || s.status === "uploading"));
     setSummary(null);
   };
 
-  // ── Derived state ───────────────────────────────────────────────────────
-
-  const pendingCount  = staged.filter(s => !s.status).length;
-  const hasAnyDone    = staged.some(s => s.status && s.status !== "uploading");
-  const canUpload     = pendingCount > 0 && !uploading;
+  const pendingCount = staged.filter(s => !s.status).length;
+  const hasAnyDone   = staged.some(s => s.status && s.status !== "uploading");
+  const canUpload    = pendingCount > 0 && !uploading;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", gap: "0" }}>
@@ -259,12 +222,13 @@ export default function KnowledgeUpload() {
           margin: "16px 16px 0",
           border: `2px dashed ${isDragging ? "var(--accent)" : "var(--border)"}`,
           borderRadius: "14px",
-          padding: "24px 16px",
+          padding: "clamp(16px, 4vw, 24px) 16px",
           display: "flex", flexDirection: "column", alignItems: "center", gap: "10px",
           background: isDragging ? "rgba(124,111,255,0.06)" : "var(--surface2)",
           cursor: "pointer",
           transition: "all 0.2s",
           flexShrink: 0,
+          minHeight: 120,
         }}
       >
         <div style={{
@@ -281,12 +245,11 @@ export default function KnowledgeUpload() {
             {isDragging ? "Drop files here" : "Drag & drop files"}
           </p>
           <p style={{ fontSize: "11px", color: "var(--text-muted)", margin: "4px 0 0" }}>
-            or <span style={{ color: "var(--accent)" }}>click to browse</span>
+            or <span style={{ color: "var(--accent)" }}>tap to browse</span>
           </p>
         </div>
-        <div style={{
-          display: "flex", gap: "6px", flexWrap: "wrap", justifyContent: "center",
-        }}>
+        {/* Extension chips — wrap gracefully on narrow screens */}
+        <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", justifyContent: "center" }}>
           {ALLOWED_EXT.map(ext => (
             <span key={ext} style={{
               fontSize: "10px", padding: "2px 8px", borderRadius: "999px",
@@ -311,36 +274,25 @@ export default function KnowledgeUpload() {
       </div>
 
       {/* ── Limits hint ──────────────────────────────────────────────────── */}
-      <div style={{
-        display: "flex", alignItems: "center", gap: "6px",
-        padding: "8px 20px 0",
-        flexShrink: 0,
-      }}>
+      <div style={{ display: "flex", alignItems: "center", gap: "6px", padding: "8px 20px 0", flexShrink: 0 }}>
         <Info size={11} style={{ color: "var(--text-muted)", flexShrink: 0 }} />
         <p style={{ fontSize: "10px", color: "var(--text-muted)", margin: 0 }}>
-          Max {MAX_FILES} files · {MAX_SIZE_MB} MB each · Duplicates skipped automatically
+          Max {MAX_FILES} files · {MAX_SIZE_MB} MB each · Duplicates skipped
         </p>
       </div>
 
       {/* ── Staged file list ──────────────────────────────────────────────── */}
       {staged.length > 0 && (
-        <div style={{
-          flex: 1, overflowY: "auto", padding: "10px 16px",
-          display: "flex", flexDirection: "column", gap: "6px", minHeight: 0,
-        }}>
+        <div style={{ flex: 1, overflowY: "auto", padding: "10px 16px", display: "flex", flexDirection: "column", gap: "6px", minHeight: 0 }}>
           {staged.map(sf => (
             <StagedRow key={sf.id} sf={sf} onRemove={removeFile} />
           ))}
         </div>
       )}
 
-      {/* ── Empty state (no files staged) ───────────────────────────────── */}
+      {/* ── Empty state ─────────────────────────────────────────────────── */}
       {staged.length === 0 && (
-        <div style={{
-          flex: 1, display: "flex", flexDirection: "column",
-          alignItems: "center", justifyContent: "center", gap: "10px",
-          padding: "24px",
-        }}>
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "10px", padding: "24px" }}>
           <Database size={28} style={{ color: "var(--border)" }} />
           <p style={{ fontSize: "12px", color: "var(--text-muted)", textAlign: "center", margin: 0 }}>
             Your uploaded documents will be chunked, embedded, and added to the AI knowledge base.
@@ -354,8 +306,7 @@ export default function KnowledgeUpload() {
           margin: "0 16px",
           padding: "10px 14px",
           borderRadius: "10px",
-          background: summary.failed === 0
-            ? "rgba(111,255,212,0.08)" : "rgba(251,191,36,0.08)",
+          background: summary.failed === 0 ? "rgba(111,255,212,0.08)" : "rgba(251,191,36,0.08)",
           border: `1px solid ${summary.failed === 0 ? "rgba(111,255,212,0.25)" : "rgba(251,191,36,0.25)"}`,
           display: "flex", alignItems: "center", gap: "8px",
           flexShrink: 0,
@@ -373,44 +324,37 @@ export default function KnowledgeUpload() {
 
       {/* ── Action buttons ───────────────────────────────────────────────── */}
       <div style={{
-        padding: "12px 16px 16px",
+        padding: "12px 16px max(16px, env(safe-area-inset-bottom))",
         display: "flex", gap: "8px",
         borderTop: staged.length > 0 ? "1px solid var(--border)" : "none",
         flexShrink: 0,
       }}>
         {hasAnyDone && (
-          <button
-            onClick={clearDone}
-            style={{
-              flex: 1, padding: "10px", borderRadius: "10px",
-              background: "var(--surface2)", border: "1px solid var(--border)",
-              color: "var(--text-muted)", fontSize: "12px", fontWeight: 600,
-              cursor: "pointer", fontFamily: "Syne, sans-serif",
-            }}
-          >
+          <button onClick={clearDone} style={{
+            flex: 1, padding: "12px", borderRadius: "10px",
+            background: "var(--surface2)", border: "1px solid var(--border)",
+            color: "var(--text-muted)", fontSize: "13px", fontWeight: 600,
+            cursor: "pointer", fontFamily: "Syne, sans-serif",
+            minHeight: "var(--touch-min)",
+          }}>
             Clear done
           </button>
         )}
 
         {pendingCount > 0 && (
-          <button
-            onClick={handleUpload}
-            disabled={!canUpload}
-            style={{
-              flex: 2, padding: "10px", borderRadius: "10px",
-              background: canUpload
-                ? "linear-gradient(135deg, var(--accent), #9c6fff)"
-                : "var(--border)",
-              border: "none",
-              color: "white", fontSize: "12px", fontWeight: 700,
-              cursor: canUpload ? "pointer" : "not-allowed",
-              fontFamily: "Syne, sans-serif",
-              display: "flex", alignItems: "center", justifyContent: "center", gap: "6px",
-              opacity: canUpload ? 1 : 0.5,
-              boxShadow: canUpload ? "0 4px 16px rgba(124,111,255,0.3)" : "none",
-              transition: "all 0.2s",
-            }}
-          >
+          <button onClick={handleUpload} disabled={!canUpload} style={{
+            flex: 2, padding: "12px", borderRadius: "10px",
+            background: canUpload ? "linear-gradient(135deg, var(--accent), #9c6fff)" : "var(--border)",
+            border: "none",
+            color: "white", fontSize: "13px", fontWeight: 700,
+            cursor: canUpload ? "pointer" : "not-allowed",
+            fontFamily: "Syne, sans-serif",
+            display: "flex", alignItems: "center", justifyContent: "center", gap: "6px",
+            opacity: canUpload ? 1 : 0.5,
+            boxShadow: canUpload ? "0 4px 16px rgba(124,111,255,0.3)" : "none",
+            transition: "all 0.2s",
+            minHeight: "var(--touch-min)",
+          }}>
             {uploading
               ? <><Loader2 size={13} className="animate-spin" /> Uploading…</>
               : <><Sparkles size={13} /> Index {pendingCount} file{pendingCount > 1 ? "s" : ""}</>

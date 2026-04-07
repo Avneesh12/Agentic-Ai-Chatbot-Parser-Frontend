@@ -1,14 +1,5 @@
 "use client";
 
-/**
- * UploadPanel — Multi-file RAG knowledge base uploader
- *
- * Gated by NEXT_PUBLIC_ENABLE_RAG_UPLOAD=true
- * Accepts PDF, DOCX, TXT, CSV, XLSX, MD — up to 20 files, 20 MB each
- * Drag-and-drop + click to browse
- * Shows per-file progress → status report from backend
- */
-
 import { useState, useRef, useCallback } from "react";
 import {
   Upload, X, FileText, CheckCircle2, XCircle, AlertCircle,
@@ -43,10 +34,10 @@ interface Props {
 }
 
 export default function UploadPanel({ onClose }: Props) {
-  const [queue,    setQueue]    = useState<QueuedFile[]>([]);
-  const [uploading, setUploading] = useState(false);
-  const [result,   setResult]   = useState<UploadResponse | null>(null);
-  const [dragOver, setDragOver] = useState(false);
+  const [queue,       setQueue]       = useState<QueuedFile[]>([]);
+  const [uploading,   setUploading]   = useState(false);
+  const [result,      setResult]      = useState<UploadResponse | null>(null);
+  const [dragOver,    setDragOver]    = useState(false);
   const [showDetails, setShowDetails] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -97,39 +88,45 @@ export default function UploadPanel({ onClose }: Props) {
 
   return (
     <div className="flex flex-col h-full" style={{ background: "var(--surface)" }}>
-      {/* Header */}
-      <div className="flex items-center justify-between px-5 py-4 flex-shrink-0"
-        style={{ borderBottom: "1px solid var(--border)" }}>
-        <div className="flex items-center gap-3">
-          <div className="flex items-center justify-center rounded-lg"
+
+      {/* ── Header ─────────────────────────────────────────────────────── */}
+      <div
+        className="flex items-center justify-between px-4 sm:px-5 py-3 sm:py-4 flex-shrink-0"
+        style={{ borderBottom: "1px solid var(--border)" }}
+      >
+        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+          <div className="flex items-center justify-center rounded-lg flex-shrink-0"
             style={{ width: 34, height: 34, background: "var(--teal-dim)", border: "1px solid rgba(0,212,170,0.25)" }}>
             <Database size={15} style={{ color: "var(--teal)" }} />
           </div>
-          <div>
+          <div className="min-w-0">
             <p style={{ fontFamily: "var(--font-display)", fontWeight: 600, fontSize: 14, color: "var(--ink)" }}>
               Knowledge Base
             </p>
-            <p style={{ fontSize: 11, color: "var(--ink3)" }}>
+            {/* Format list wraps on narrow screens */}
+            <p style={{ fontSize: 10, color: "var(--ink3)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
               PDF · DOCX · TXT · CSV · XLSX · MD
             </p>
           </div>
         </div>
+        {/* Close — 44x44 */}
         <button onClick={onClose}
-          className="flex items-center justify-center rounded-lg transition-colors"
-          style={{ width: 30, height: 30, background: "var(--surface2)", border: "1px solid var(--border)", color: "var(--ink3)" }}>
-          <X size={13} />
+          className="flex items-center justify-center rounded-lg transition-colors flex-shrink-0"
+          style={{ width: 44, height: 44, background: "var(--surface2)", border: "1px solid var(--border)", color: "var(--ink3)" }}>
+          <X size={15} />
         </button>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-5 py-4 flex flex-col gap-4 min-h-0">
+      <div className="flex-1 overflow-y-auto px-4 sm:px-5 py-4 flex flex-col gap-4 min-h-0">
 
-        {/* Drop zone */}
+        {/* ── Drop zone ────────────────────────────────────────────────── */}
         <div
           className={`rounded-xl flex flex-col items-center justify-center gap-3 text-center cursor-pointer transition-all ${dragOver ? "drag-over" : ""}`}
           style={{
-            minHeight: 140, border: "2px dashed var(--border2)",
+            minHeight: 130,
+            border: "2px dashed var(--border2)",
             background: dragOver ? "rgba(0,212,170,0.04)" : "var(--bg2)",
-            padding: "24px 16px",
+            padding: "20px 16px",
           }}
           onDragOver={e => { e.preventDefault(); setDragOver(true); }}
           onDragLeave={() => setDragOver(false)}
@@ -145,14 +142,13 @@ export default function UploadPanel({ onClose }: Props) {
               {dragOver ? "Drop to add files" : "Drag & drop files here"}
             </p>
             <p style={{ fontSize: 11, color: "var(--ink3)" }}>
-              or click to browse · max {MAX_SIZE_MB} MB per file · up to 20 files
+              or tap to browse · max {MAX_SIZE_MB} MB · up to 20 files
             </p>
           </div>
-          <input ref={inputRef} type="file" multiple hidden
-            accept={ALLOWED.join(",")} onChange={onPick} />
+          <input ref={inputRef} type="file" multiple hidden accept={ALLOWED.join(",")} onChange={onPick} />
         </div>
 
-        {/* Queue */}
+        {/* ── Queue ────────────────────────────────────────────────────── */}
         {queue.length > 0 && (
           <div className="flex flex-col gap-2">
             <div className="flex items-center justify-between">
@@ -161,37 +157,40 @@ export default function UploadPanel({ onClose }: Props) {
               </p>
               <button onClick={() => setQueue([])}
                 className="flex items-center gap-1 text-xs transition-colors"
-                style={{ color: "var(--ink3)", background: "none", border: "none", cursor: "pointer" }}>
+                style={{ color: "var(--ink3)", background: "none", border: "none", cursor: "pointer", minHeight: "var(--touch-min)", padding: "0 4px" }}>
                 <Trash2 size={11} /> Clear all
               </button>
             </div>
             {queue.map(q => (
               <div key={q.id} className="flex items-center gap-3 px-3 py-2.5 rounded-lg"
                 style={{ background: "var(--surface2)", border: "1px solid var(--border)" }}>
+                {/* File type badge */}
                 <div className="flex items-center justify-center rounded text-xs font-bold flex-shrink-0"
                   style={{ width: 32, height: 32, background: "var(--surface3)", color: "var(--teal)", fontFamily: "var(--font-display)", fontSize: 9 }}>
                   {fileExt(q.file.name)}
                 </div>
+                {/* File name — truncates on narrow screens */}
                 <div className="flex-1 min-w-0">
                   <p style={{ fontSize: 12, color: "var(--ink)", fontWeight: 500 }} className="truncate">
                     {q.file.name}
                   </p>
                   <p style={{ fontSize: 10, color: "var(--ink3)" }}>{fileSizeFmt(q.file.size)}</p>
                 </div>
+                {/* Remove — 44x44 touch target */}
                 <button onClick={() => remove(q.id)}
-                  className="flex-shrink-0 transition-colors p-1"
-                  style={{ color: "var(--ink3)", background: "none", border: "none", cursor: "pointer" }}>
-                  <X size={12} />
+                  className="flex-shrink-0 flex items-center justify-center transition-colors"
+                  style={{ width: 36, height: 36, color: "var(--ink3)", background: "none", border: "none", cursor: "pointer", minHeight: "unset" }}>
+                  <X size={13} />
                 </button>
               </div>
             ))}
           </div>
         )}
 
-        {/* Upload button */}
+        {/* ── Upload button ─────────────────────────────────────────────── */}
         {queue.length > 0 && (
           <button onClick={upload} disabled={uploading}
-            className="w-full py-3 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 transition-all flex-shrink-0"
+            className="w-full rounded-xl text-sm font-semibold flex items-center justify-center gap-2 transition-all flex-shrink-0"
             style={{
               fontFamily: "var(--font-display)",
               background: uploading ? "var(--surface3)" : "linear-gradient(135deg, var(--teal), var(--blue))",
@@ -199,6 +198,8 @@ export default function UploadPanel({ onClose }: Props) {
               cursor: uploading ? "not-allowed" : "pointer",
               border: "none",
               boxShadow: uploading ? "none" : "0 4px 20px rgba(0,212,170,0.2)",
+              padding: "14px",
+              minHeight: "var(--touch-min)",
             }}>
             {uploading
               ? <><Loader2 size={14} style={{ animation: "spin 1s linear infinite" }} /> Indexing…</>
@@ -207,26 +208,27 @@ export default function UploadPanel({ onClose }: Props) {
           </button>
         )}
 
-        {/* Result */}
+        {/* ── Result ───────────────────────────────────────────────────── */}
         {result && (
           <div className="rounded-xl overflow-hidden fade-up"
             style={{ border: "1px solid var(--border2)", background: "var(--bg2)" }}>
             {/* Summary bar */}
-            <div className="flex items-center justify-between px-4 py-3"
+            <div className="flex items-center justify-between px-3 sm:px-4 py-3"
               style={{ borderBottom: result.files.length > 0 ? "1px solid var(--border)" : "none" }}>
-              <div className="flex items-center gap-3">
-                <CheckCircle2 size={16} style={{ color: result.summary.indexed > 0 ? "var(--teal)" : "var(--red)" }} />
-                <div>
+              <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+                <CheckCircle2 size={16} style={{ color: result.summary.indexed > 0 ? "var(--teal)" : "var(--red)", flexShrink: 0 }} />
+                <div className="min-w-0">
                   <p style={{ fontSize: 13, fontWeight: 600, color: "var(--ink)", fontFamily: "var(--font-display)" }}>
                     {result.summary.indexed > 0 ? "Indexed successfully" : "Index failed"}
                   </p>
                   <p style={{ fontSize: 11, color: "var(--ink3)" }}>
-                    {result.summary.indexed}/{result.summary.total} files added to knowledge base
+                    {result.summary.indexed}/{result.summary.total} files added
                   </p>
                 </div>
               </div>
+              {/* Toggle — 44x44 */}
               <button onClick={() => setShowDetails(p => !p)}
-                className="p-1" style={{ color: "var(--ink3)", background: "none", border: "none", cursor: "pointer" }}>
+                style={{ width: 44, height: 44, color: "var(--ink3)", background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", minHeight: "unset" }}>
                 {showDetails ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
               </button>
             </div>
@@ -235,7 +237,7 @@ export default function UploadPanel({ onClose }: Props) {
             {showDetails && (
               <div className="flex flex-col divide-y" style={{ borderColor: "var(--border)" }}>
                 {result.files.map((f, i) => (
-                  <div key={i} className="flex items-start gap-3 px-4 py-2.5">
+                  <div key={i} className="flex items-start gap-3 px-3 sm:px-4 py-2.5">
                     <StatusIcon status={f.status} />
                     <div className="flex-1 min-w-0">
                       <p style={{ fontSize: 12, color: "var(--ink)", fontWeight: 500 }} className="truncate">{f.filename}</p>
@@ -258,7 +260,7 @@ export default function UploadPanel({ onClose }: Props) {
           </div>
         )}
 
-        {/* Empty state when nothing queued and no result */}
+        {/* ── Empty state ───────────────────────────────────────────────── */}
         {!queue.length && !result && (
           <div className="flex flex-col items-center justify-center gap-3 py-6 text-center">
             <FileText size={28} style={{ color: "var(--ink3)" }} />

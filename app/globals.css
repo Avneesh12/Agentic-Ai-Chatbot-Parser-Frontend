@@ -22,10 +22,17 @@
   --glow-blue: rgba(59,130,246,0.15);
   --font-display: 'Bricolage Grotesque', sans-serif;
   --font-mono:    'IBM Plex Mono', monospace;
+  --touch-min: 44px;
 }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-html { height: 100%; }
+
+html {
+  height: 100%;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
 body {
   height: 100%;
   background: var(--bg);
@@ -33,7 +40,11 @@ body {
   font-family: var(--font-mono);
   overflow-x: hidden;
   -webkit-font-smoothing: antialiased;
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
 }
+
+img { max-width: 100%; height: auto; display: block; }
 
 ::-webkit-scrollbar { width: 3px; height: 3px; }
 ::-webkit-scrollbar-track { background: transparent; }
@@ -91,3 +102,50 @@ body {
 .dot:nth-child(3) { animation: dotBounce 1.2s ease infinite 0.3s; }
 
 .drag-over { border-color:var(--teal) !important; background:rgba(0,212,170,0.05) !important; }
+
+/* Side panel: full-width on mobile */
+.side-panel { width: 100vw; }
+@media (min-width: 480px) { .side-panel { width: min(420px, 100vw); } }
+
+/* Modal: bottom sheet on mobile, centered on sm+ */
+.modal-overlay {
+  position: fixed; inset: 0; z-index: 9999;
+  display: flex; align-items: flex-end; justify-content: center;
+  background: rgba(0,0,0,0.8); backdrop-filter: blur(12px);
+  padding: 0;
+}
+@media (min-width: 640px) {
+  .modal-overlay { align-items: center; padding: 16px; }
+}
+
+.modal-card {
+  width: 100%; max-height: 95dvh; overflow-y: auto;
+  border-radius: 20px 20px 0 0;
+}
+@media (min-width: 640px) {
+  .modal-card { max-width: 420px; max-height: 90dvh; border-radius: 20px; }
+}
+
+/* Feature grid */
+.feature-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  width: 100%;
+}
+@media (min-width: 640px) {
+  .feature-grid { grid-template-columns: repeat(4, 1fr); gap: 12px; }
+}
+
+/* Bubble width */
+.bubble-max { max-width: 88%; }
+@media (min-width: 480px) { .bubble-max { max-width: 78%; } }
+
+/* Ensure all interactive elements are easily tappable */
+button { cursor: pointer; }
+input, textarea, select { font-size: 16px; } /* Prevent iOS zoom on focus */
+
+/* Safe area bottom padding for chat input */
+.safe-bottom {
+  padding-bottom: max(16px, env(safe-area-inset-bottom));
+}
