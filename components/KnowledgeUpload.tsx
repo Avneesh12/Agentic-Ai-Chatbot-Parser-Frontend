@@ -20,7 +20,7 @@ import {
   CheckCircle2, XCircle, AlertCircle, Loader2,
   Database, Sparkles, Info,
 } from "lucide-react";
-import { uploadDocuments, FileUploadResult } from "@/lib/api";
+import { uploadFiles, FileUploadResult } from "@/lib/api";
 
 const ENABLED = process.env.NEXT_PUBLIC_ENABLE_RAG_UPLOAD === "true";
 const ALLOWED_EXT = [".pdf", ".docx", ".txt", ".csv", ".xlsx", ".md"];
@@ -202,7 +202,7 @@ export default function KnowledgeUpload() {
     ));
 
     try {
-      const result = await uploadDocuments(pending.map(s => s.file));
+      const result = await uploadFiles(pending.map(s => s.file));
 
       // Map results back to staged files by filename
       setStaged(prev => prev.map(s => {
